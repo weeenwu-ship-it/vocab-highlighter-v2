@@ -350,7 +350,7 @@ function hideError() { errorBox.style.display = 'none'; }
 // ===== API Helper =====
 async function callAPI(messages, temp = 0.3) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 90000);
 
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -431,9 +431,13 @@ $('submit-btn').addEventListener('click', async () => {
   try {
     statusText.textContent = '正在压缩图片...';
     detailText.textContent = '';
-    const base64 = await compressImage(selectedFile);
+    const base64 = await compressImage(selectedFile, 2048, 0.85);
+    const base64Small = await compressImage(selectedFile, 1280, 0.7);
     const imageContent = [
       { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
+    ];
+    const imageContentSmall = [
+      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Small}` } }
     ];
 
     // === Pass 1: Full scan ===
@@ -488,7 +492,7 @@ $('submit-btn').addEventListener('click', async () => {
     try {
       const content2 = await callAPI([{
         role: 'user',
-        content: [...imageContent, { type: 'text', text: prompt2 }]
+        content: [...imageContentSmall, { type: 'text', text: prompt2 }]
       }]);
       const parsed2 = parseWordsJSON(content2);
       pass2Words = parsed2.words || [];
