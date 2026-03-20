@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: body.model || 'ernie-4.5-turbo-vl',
           messages: body.messages,
-          max_tokens: body.max_tokens || 16000,
+          max_tokens: body.max_tokens || 3000,
           temperature: body.temperature ?? 0.3,
         }),
       }

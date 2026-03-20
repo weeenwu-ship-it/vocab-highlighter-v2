@@ -359,7 +359,7 @@ async function callAPI(messages, temp = 0.3) {
     body: JSON.stringify({
       model: MODEL,
       messages,
-      max_tokens: 16000,
+      max_tokens: 3000,
       temperature: temp,
     }),
   });
@@ -431,8 +431,8 @@ $('submit-btn').addEventListener('click', async () => {
   try {
     statusText.textContent = '正在压缩图片...';
     detailText.textContent = '';
-    const base64 = await compressImage(selectedFile, 2048, 0.85);
-    const base64Small = await compressImage(selectedFile, 1280, 0.7);
+    const base64 = await compressImage(selectedFile, 1280, 0.6);
+    const base64Small = await compressImage(selectedFile, 1024, 0.5);
     const imageContent = [
       { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
     ];
