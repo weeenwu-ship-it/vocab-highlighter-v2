@@ -601,13 +601,36 @@ async function callAPI(messages, temp = 0.3) {
 }
 
 function parseWordsJSON(content) {
-  try {
-    return JSON.parse(content);
-  } catch {
-    const m = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*"words"[\s\S]*\})/);
-    if (m) return JSON.parse(m[1].trim());
-    throw new Error('识别结果解析失败');
+  // Try direct parse
+  try { return JSON.parse(content); } catch {}
+
+  // Try extracting from markdown code block
+  const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlock) {
+    try { return JSON.parse(codeBlock[1].trim()); } catch {}
   }
+
+  // Try extracting the {"words": [...]} structure
+  const jsonMatch = content.match(/\{\s*"words"\s*:\s*\[[\s\S]*\]\s*\}/);
+  if (jsonMatch) {
+    try { return JSON.parse(jsonMatch[0]); } catch {}
+    // Fix common issues: trailing commas, truncated JSON
+    let fixed = jsonMatch[0]
+      .replace(/,\s*([}\]])/g, '$1')  // remove trailing commas
+      .replace(/,\s*$/, '');           // remove trailing comma at end
+    try { return JSON.parse(fixed); } catch {}
+  }
+
+  // Try to extract individual word objects if JSON is truncated
+  const wordPattern = /\{\s*"word"\s*:\s*"([^"]+)"\s*,\s*"phonetic"\s*:\s*"([^"]*)"\s*,\s*"pos"\s*:\s*"([^"]*)"\s*,\s*"meaning"\s*:\s*"([^"]*)"\s*\}/g;
+  const extracted = [];
+  let match;
+  while ((match = wordPattern.exec(content)) !== null) {
+    extracted.push({ word: match[1], phonetic: match[2], pos: match[3], meaning: match[4] });
+  }
+  if (extracted.length > 0) return { words: extracted };
+
+  throw new Error('识别结果解析失败，请重试');
 }
 
 function mergeWords(pass1, pass2) {
