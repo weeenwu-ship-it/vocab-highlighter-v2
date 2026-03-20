@@ -814,51 +814,24 @@ $('reset-btn').addEventListener('click', () => {
   showPage('upload');
 });
 
-// ===== Export Word =====
+// ===== Export Word (server-side for mobile compatibility) =====
 $('export-word').addEventListener('click', () => {
   if (words.length === 0) return;
   const dateStr = new Date().toLocaleDateString('zh-CN');
+  const data = JSON.stringify({ words, date: dateStr });
 
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
-xmlns:w="urn:schemas-microsoft-com:office:word"
-xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8">
-<style>
-  body { font-family: "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif; margin: 40px; }
-  h1 { text-align: center; color: #1a1a2e; font-size: 24px; margin-bottom: 4px; }
-  .sub { text-align: center; color: #888; font-size: 12px; margin-bottom: 20px; }
-  .brand { text-align: center; color: #6C3CE1; font-size: 11px; margin-bottom: 24px; letter-spacing: 2px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #6C3CE1; color: #fff; padding: 10px 14px; font-size: 14px; text-align: left; }
-  td { padding: 8px 14px; font-size: 13px; border-bottom: 1px solid #e8e6f0; }
-  tr:nth-child(even) td { background: #f8f5ff; }
-  .word { font-weight: bold; font-size: 14px; }
-  .phonetic { color: #6C3CE1; font-family: "Consolas", monospace; }
-  .pos { color: #d97706; font-weight: bold; }
-</style></head>
-<body>
-<h1>生词表</h1>
-<p class="sub">共 ${words.length} 个单词 &middot; ${dateStr}</p>
-<p class="brand">此在教育 CIZAI EDUCATION</p>
-<table>
-<tr><th>序号</th><th>单词</th><th>音标</th><th>词性</th><th>释义</th></tr>
-${words.map((w, i) => `<tr>
-  <td>${i + 1}</td>
-  <td class="word">${esc(w.word)}</td>
-  <td class="phonetic">${esc(w.phonetic)}</td>
-  <td class="pos">${esc(w.pos)}</td>
-  <td>${esc(w.meaning)}</td>
-</tr>`).join('')}
-</table>
-</body></html>`;
-
-  const blob = new Blob([html], { type: 'application/msword' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `生词表_${dateStr.replace(/\//g, '-')}.doc`;
-  a.click();
-  URL.revokeObjectURL(url);
+  // Use form submission - triggers native browser download on all platforms
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/api/export';
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'data';
+  input.value = data;
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
 });
 </script>
 </body>
