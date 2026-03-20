@@ -86,20 +86,43 @@ main { flex: 1; display: flex; flex-direction: column; }
 .upload-zone p { font-size: 15px; font-weight: 500; color: #3a3a3c; margin-bottom: 4px; }
 .upload-zone small { font-size: 13px; color: #aeaeb2; }
 
-/* Preview */
+/* Preview - Thumbnail Grid */
 .preview-area { flex: 1; display: flex; flex-direction: column; }
-.preview-img-wrap {
-  flex: 1; padding: 12px; display: flex; align-items: center;
-  justify-content: center; background: #f5f5f7; border-radius: 16px 16px 0 0;
-  position: relative;
+.preview-thumbs {
+  flex: 1; padding: 12px; display: flex; flex-wrap: wrap;
+  gap: 8px; background: #f5f5f7; border-radius: 16px 16px 0 0;
+  overflow-y: auto; align-content: flex-start;
 }
-.preview-img-wrap img { max-width: 100%; max-height: 45vh; object-fit: contain; border-radius: 8px; }
-.clear-btn {
-  position: absolute; top: 16px; right: 16px;
-  width: 32px; height: 32px; border-radius: 50%;
-  background: rgba(0,0,0,0.5); color: #fff; border: none;
+.thumb-item {
+  width: calc(33.33% - 6px); aspect-ratio: 3/4;
+  border-radius: 8px; overflow: hidden;
+  position: relative; background: #e5e5ea;
+}
+.thumb-item img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-item .thumb-remove {
+  position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); color: #fff; border: none;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
 }
+.thumb-item .thumb-idx {
+  position: absolute; bottom: 4px; left: 4px;
+  background: rgba(105,48,195,0.8); color: #fff;
+  font-size: 11px; padding: 1px 6px; border-radius: 4px;
+}
+.preview-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: #fff; border-top: 1px solid #f2f2f7;
+}
+.btn-add {
+  padding: 8px 16px; background: #f8f5ff; color: #6930c3;
+  border: 1px solid #e8e0f7; border-radius: 8px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+}
+.btn-add:hover { background: #e8e0f7; }
+.file-count { font-size: 13px; color: #8e8e93; }
+
 .submit-wrap { padding: 16px; }
 .btn-primary {
   width: 100%; padding: 14px; background: #6930c3; color: #fff;
@@ -177,14 +200,16 @@ main { flex: 1; display: flex; flex-direction: column; }
 /* Export */
 .export-bar {
   padding: 16px; background: #fff;
-  border-top: 1px solid #f2f2f7; display: flex; gap: 12px;
+  border-top: 1px solid #f2f2f7; display: flex; gap: 8px;
 }
 .btn-export {
   flex: 1; padding: 12px; border: none; border-radius: 12px;
-  font-size: 14px; font-weight: 500; cursor: pointer; color: #fff;
+  font-size: 13px; font-weight: 500; cursor: pointer; color: #fff;
 }
 .btn-pdf { background: #6930c3; }
 .btn-pdf:hover { background: #5b21b6; }
+.btn-word { background: #2563eb; }
+.btn-word:hover { background: #1d4ed8; }
 .btn-excel { background: #059669; }
 .btn-excel:hover { background: #047857; }
 .btn-export:disabled { opacity: 0.5; }
@@ -200,31 +225,28 @@ main { flex: 1; display: flex; flex-direction: column; }
     <div class="instructions">
       <h2>使用说明</h2>
       <div class="step"><span class="step-num">1</span><span>用荧光笔在英语试卷上标出不认识的生词</span></div>
-      <div class="step"><span class="step-num">2</span><span>拍照或从相册选择图片上传</span></div>
+      <div class="step"><span class="step-num">2</span><span>拍照或从相册选择图片上传（支持多张）</span></div>
       <div class="step"><span class="step-num">3</span><span>自动识别高亮单词，生成带音标和释义的生词表</span></div>
-      <div class="step"><span class="step-num">4</span><span>导出 PDF 或 Excel 文件</span></div>
+      <div class="step"><span class="step-num">4</span><span>导出 PDF、Word 或 Excel 文件</span></div>
     </div>
     <div id="error-box" class="error-msg" style="display:none"></div>
     <div class="upload-area">
       <div id="upload-zone" class="upload-zone">
-        <input type="file" id="file-input" accept="image/*" capture="environment">
+        <input type="file" id="file-input" accept="image/*" multiple>
         <div class="camera-icon">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"/>
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"/>
           </svg>
         </div>
-        <p>点击拍照或选择图片</p>
-        <small>支持 JPG、PNG 格式</small>
+        <p>点击选择图片（可多选）</p>
+        <small>支持 JPG、PNG 格式，可选择多张试卷</small>
       </div>
       <div id="preview-area" class="preview-area" style="display:none">
-        <div class="preview-img-wrap">
-          <img id="preview-img" src="" alt="预览">
-          <button class="clear-btn" id="clear-btn">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
+        <div class="preview-thumbs" id="preview-thumbs"></div>
+        <div class="preview-actions">
+          <button class="btn-add" id="add-more-btn">+ 继续添加</button>
+          <span class="file-count" id="file-count">已选 0 张</span>
         </div>
         <div class="submit-wrap">
           <button class="btn-primary" id="submit-btn">开始识别</button>
@@ -250,8 +272,9 @@ main { flex: 1; display: flex; flex-direction: column; }
     </div>
     <div class="word-list" id="word-list"></div>
     <div class="export-bar">
-      <button class="btn-export btn-pdf" id="export-pdf">导出 PDF</button>
-      <button class="btn-export btn-excel" id="export-excel">导出 Excel</button>
+      <button class="btn-export btn-pdf" id="export-pdf">PDF</button>
+      <button class="btn-export btn-word" id="export-word">Word</button>
+      <button class="btn-export btn-excel" id="export-excel">Excel</button>
     </div>
   </div>
 </main>
@@ -262,7 +285,7 @@ const API_URL = '/api/recognize';
 const MODEL = 'ernie-4.5-turbo-vl';
 
 // ===== State =====
-let selectedFile = null;
+let selectedFiles = [];
 let words = [];
 
 // ===== DOM =====
@@ -306,8 +329,13 @@ function compressImage(file, maxSize = 2048, quality = 0.85) {
 const uploadZone = $('upload-zone');
 const fileInput = $('file-input');
 const previewArea = $('preview-area');
-const previewImg = $('preview-img');
 const errorBox = $('error-box');
+const addMoreInput = document.createElement('input');
+addMoreInput.type = 'file';
+addMoreInput.accept = 'image/*';
+addMoreInput.multiple = true;
+addMoreInput.style.display = 'none';
+document.body.appendChild(addMoreInput);
 
 uploadZone.addEventListener('click', () => fileInput.click());
 uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
@@ -315,31 +343,62 @@ uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag
 uploadZone.addEventListener('drop', e => {
   e.preventDefault();
   uploadZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) selectFile(file);
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) addFiles(files);
 });
 
 fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  const files = [...fileInput.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) addFiles(files);
 });
 
-function selectFile(file) {
-  selectedFile = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    previewImg.src = e.target.result;
-    uploadZone.style.display = 'none';
-    previewArea.style.display = 'flex';
-  };
-  reader.readAsDataURL(file);
+$('add-more-btn').addEventListener('click', () => addMoreInput.click());
+addMoreInput.addEventListener('change', () => {
+  const files = [...addMoreInput.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) addFiles(files);
+  addMoreInput.value = '';
+});
+
+function addFiles(files) {
+  selectedFiles.push(...files);
+  renderThumbnails();
+  uploadZone.style.display = 'none';
+  previewArea.style.display = 'flex';
 }
 
-$('clear-btn').addEventListener('click', () => {
-  selectedFile = null;
-  fileInput.value = '';
-  previewArea.style.display = 'none';
-  uploadZone.style.display = 'flex';
-});
+function renderThumbnails() {
+  const container = $('preview-thumbs');
+  container.innerHTML = '';
+  selectedFiles.forEach((file, i) => {
+    const item = document.createElement('div');
+    item.className = 'thumb-item';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'thumb-remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.onclick = (e) => { e.stopPropagation(); removeFile(i); };
+    const idx = document.createElement('span');
+    idx.className = 'thumb-idx';
+    idx.textContent = i + 1;
+    item.appendChild(img);
+    item.appendChild(removeBtn);
+    item.appendChild(idx);
+    container.appendChild(item);
+  });
+  $('file-count').textContent = `已选 ${selectedFiles.length} 张`;
+}
+
+function removeFile(index) {
+  selectedFiles.splice(index, 1);
+  if (selectedFiles.length === 0) {
+    previewArea.style.display = 'none';
+    uploadZone.style.display = 'flex';
+    fileInput.value = '';
+  } else {
+    renderThumbnails();
+  }
+}
 
 function showError(msg) {
   errorBox.textContent = msg;
@@ -389,15 +448,12 @@ function mergeWords(pass1, pass2) {
   const seen = new Set();
   const merged = [];
 
-  // Normalize: split phrases into individual words for dedup
   function normalizeKey(word) {
     return word.toLowerCase().trim().replace(/\s+/g, ' ');
   }
 
-  // First, collect all individual words from both passes
   const allWords = [...pass1, ...pass2];
 
-  // Filter out multi-word phrases if we already have the individual word
   const singleWords = new Set();
   for (const w of allWords) {
     const parts = normalizeKey(w.word).split(' ');
@@ -407,10 +463,7 @@ function mergeWords(pass1, pass2) {
   for (const w of allWords) {
     const key = normalizeKey(w.word);
     const parts = key.split(' ');
-
-    // Skip multi-word entries if any individual word already exists
     if (parts.length > 1 && parts.some(p => singleWords.has(p))) continue;
-
     if (!seen.has(key)) {
       seen.add(key);
       merged.push(w);
@@ -419,32 +472,8 @@ function mergeWords(pass1, pass2) {
   return merged;
 }
 
-// ===== Submit & Two-Pass Recognition =====
-$('submit-btn').addEventListener('click', async () => {
-  if (!selectedFile) return;
-  hideError();
-  showPage('processing');
-
-  const statusText = $('processing-text');
-  const detailText = $('processing-detail');
-
-  try {
-    statusText.textContent = '正在压缩图片...';
-    detailText.textContent = '';
-    const base64 = await compressImage(selectedFile, 1280, 0.6);
-    const base64Small = await compressImage(selectedFile, 1024, 0.5);
-    const imageContent = [
-      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
-    ];
-    const imageContentSmall = [
-      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Small}` } }
-    ];
-
-    // === Pass 1: Full scan ===
-    statusText.textContent = '第 1/2 轮：正在识别生词...';
-    detailText.textContent = '全面扫描试卷中的高亮标注';
-
-    const prompt1 = `看这张英语试卷照片。有些英文单词被荧光笔涂过了（单词上有一层彩色覆盖，可能是粉红色、黄色、绿色等）。
+// ===== Prompts =====
+const PROMPT1 = `看这张英语试卷照片。有些英文单词被荧光笔涂过了（单词上有一层彩色覆盖，可能是粉红色、黄色、绿色等）。
 
 请找出所有被荧光笔标记的单词。从试卷顶部开始，一行一行往下仔细看，列出每一个被彩色荧光笔标记覆盖的英文单词。被标记的单词可能有15-30个，请不要遗漏。
 
@@ -457,23 +486,7 @@ $('submit-btn').addEventListener('click', async () => {
 
 如果没有找到任何标记的单词：{"words": []}`;
 
-    const content1 = await callAPI([{
-      role: 'user',
-      content: [...imageContent, { type: 'text', text: prompt1 }]
-    }]);
-
-    const parsed1 = parseWordsJSON(content1);
-    if (!parsed1.words || parsed1.words.length === 0) {
-      throw new Error('未识别到高亮标注的单词，请确认图片中有用荧光笔标注的英文单词');
-    }
-
-    const pass1Words = parsed1.words;
-
-    // === Pass 2: Different angle scan ===
-    statusText.textContent = '第 2/2 轮：复查中...';
-    detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在交叉复查`;
-
-    const prompt2 = `仔细看这张英语试卷照片。找出所有被粉红色或彩色荧光笔标记的英文单词。
+const PROMPT2 = `仔细看这张英语试卷照片。找出所有被粉红色或彩色荧光笔标记的英文单词。
 
 重点检查区域：
 1. 文章正文段落中被荧光笔覆盖的单词
@@ -488,22 +501,78 @@ $('submit-btn').addEventListener('click', async () => {
 纯JSON输出：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
 
-    let pass2Words = [];
-    try {
-      const content2 = await callAPI([{
-        role: 'user',
-        content: [...imageContentSmall, { type: 'text', text: prompt2 }]
-      }]);
-      const parsed2 = parseWordsJSON(content2);
-      pass2Words = parsed2.words || [];
-    } catch {
-      // Pass 2 failure is non-fatal
+// ===== Process single image (two-pass) =====
+async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) {
+  const prefix = totalImgs > 1 ? `图片 ${imgIdx}/${totalImgs}` : '';
+
+  statusText.textContent = prefix ? `${prefix} - 压缩中...` : '正在压缩图片...';
+  detailText.textContent = '';
+  const base64 = await compressImage(file, 1280, 0.6);
+  const base64Small = await compressImage(file, 1024, 0.5);
+
+  const imageContent = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }];
+  const imageContentSmall = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Small}` } }];
+
+  // Pass 1
+  statusText.textContent = prefix ? `${prefix} - 第 1/2 轮识别中...` : '第 1/2 轮：正在识别生词...';
+  detailText.textContent = '全面扫描试卷中的高亮标注';
+
+  const content1 = await callAPI([{
+    role: 'user',
+    content: [...imageContent, { type: 'text', text: PROMPT1 }]
+  }]);
+
+  const parsed1 = parseWordsJSON(content1);
+  const pass1Words = parsed1.words || [];
+
+  // Pass 2
+  statusText.textContent = prefix ? `${prefix} - 第 2/2 轮复查中...` : '第 2/2 轮：复查中...';
+  detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在交叉复查`;
+
+  let pass2Words = [];
+  try {
+    const content2 = await callAPI([{
+      role: 'user',
+      content: [...imageContentSmall, { type: 'text', text: PROMPT2 }]
+    }]);
+    const parsed2 = parseWordsJSON(content2);
+    pass2Words = parsed2.words || [];
+  } catch {
+    // Pass 2 failure is non-fatal
+  }
+
+  return mergeWords(pass1Words, pass2Words);
+}
+
+// ===== Submit & Multi-Image Recognition =====
+$('submit-btn').addEventListener('click', async () => {
+  if (selectedFiles.length === 0) return;
+  hideError();
+  showPage('processing');
+
+  const statusText = $('processing-text');
+  const detailText = $('processing-detail');
+
+  try {
+    let allWords = [];
+    const total = selectedFiles.length;
+
+    for (let i = 0; i < total; i++) {
+      const imgWords = await processOneImage(selectedFiles[i], i + 1, total, statusText, detailText);
+
+      if (i === 0 && imgWords.length === 0 && total === 1) {
+        throw new Error('未识别到高亮标注的单词，请确认图片中有用荧光笔标注的英文单词');
+      }
+
+      allWords = mergeWords(allWords, imgWords);
+      detailText.textContent = `已累计识别 ${allWords.length} 个词`;
     }
 
-    // === Merge results (union + dedup) ===
-    words = mergeWords(pass1Words, pass2Words);
-    const added = words.length - new Set(pass1Words.map(w => w.word.toLowerCase().trim())).size;
+    if (allWords.length === 0) {
+      throw new Error('所有图片均未识别到高亮标注的单词');
+    }
 
+    words = allWords;
     renderWords();
     showPage('result');
   } catch (err) {
@@ -575,7 +644,7 @@ window.deleteWord = function(i) {
 
 $('reset-btn').addEventListener('click', () => {
   words = [];
-  selectedFile = null;
+  selectedFiles = [];
   fileInput.value = '';
   previewArea.style.display = 'none';
   uploadZone.style.display = 'flex';
@@ -604,7 +673,6 @@ $('export-pdf').addEventListener('click', async () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-    // Load Chinese font with timeout and multiple CDN fallbacks
     let fontLoaded = false;
     const fontURLs = [
       'https://cdn.jsdelivr.net/gh/nicefan/font@main/SourceHanSansCN-Regular.ttf',
@@ -643,7 +711,6 @@ $('export-pdf').addEventListener('click', async () => {
     doc.setTextColor(0);
     y += 10;
 
-    // Table header
     doc.setFillColor(105, 48, 195);
     doc.rect(15, y, pageW - 30, 8, 'F');
     doc.setTextColor(255);
@@ -672,10 +739,55 @@ $('export-pdf').addEventListener('click', async () => {
 
     doc.save(`vocab_${dateStr.replace(/\//g, '-')}.pdf`);
   } catch (e) {
-    alert('PDF export failed: ' + e.message);
+    alert('PDF 导出失败: ' + e.message);
   }
   btn.disabled = false;
-  btn.textContent = '导出 PDF';
+  btn.textContent = 'PDF';
+});
+
+// ===== Export Word =====
+$('export-word').addEventListener('click', () => {
+  if (words.length === 0) return;
+  const dateStr = new Date().toLocaleDateString('zh-CN');
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+  h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 4px; }
+  .sub { text-align: center; color: #999; font-size: 12px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #6930c3; color: #fff; padding: 8px 12px; font-size: 13px; text-align: left; }
+  td { padding: 6px 12px; font-size: 13px; border-bottom: 1px solid #eee; }
+  tr:nth-child(even) td { background: #f8f5ff; }
+  .word { font-weight: 600; }
+  .phonetic { color: #6930c3; font-family: monospace; }
+  .pos { color: #d97706; }
+</style></head>
+<body>
+<h1>生词表</h1>
+<p class="sub">共 ${words.length} 个单词 · ${dateStr}</p>
+<table>
+<tr><th>序号</th><th>单词</th><th>音标</th><th>词性</th><th>释义</th></tr>
+${words.map((w, i) => `<tr>
+  <td>${i + 1}</td>
+  <td class="word">${esc(w.word)}</td>
+  <td class="phonetic">${esc(w.phonetic)}</td>
+  <td class="pos">${esc(w.pos)}</td>
+  <td>${esc(w.meaning)}</td>
+</tr>`).join('')}
+</table>
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `生词表_${dateStr.replace(/\//g, '-')}.doc`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 // ===== Export Excel =====
