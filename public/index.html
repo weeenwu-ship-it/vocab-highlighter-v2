@@ -303,7 +303,7 @@ main { flex: 1; display: flex; flex-direction: column; }
   padding: 2px 8px; border-radius: 6px; font-weight: 600;
   border: 1px solid #F0DFA0;
 }
-.word-meaning { font-size: 14px; color: var(--text-secondary); line-height: 1.4; }
+.word-meaning { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
 .word-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .word-actions button {
   width: 34px; height: 34px; border-radius: 8px; border: none;
@@ -755,6 +755,51 @@ $('submit-btn').addEventListener('click', async () => {
 
     if (allWords.length === 0) {
       throw new Error('所有图片均未识别到高亮标注的单词');
+    }
+
+    // === Enrichment pass: get all common POS & meanings ===
+    statusText.textContent = '正在丰富词义...';
+    detailText.textContent = `为 ${allWords.length} 个单词补充完整词性和释义`;
+
+    try {
+      const wordList = allWords.map(w => w.word).join(', ');
+      const enrichPrompt = `以下是一组英语单词，请为每个单词提供详细的词典信息。
+
+要求：
+1. 列出该单词所有常见词性（n./v./adj./adv./prep.等）及对应的中文释义
+2. 每个词性给出1-2个最常用的含义
+3. 不同词性之间用分号（；）分隔
+4. 格式示例：n. 展示，陈列；v. 显示，展现
+
+单词列表：${wordList}
+
+输出纯JSON格式，不要其他文字：
+{"words": [{"word": "display", "phonetic": "/dɪˈspleɪ/", "pos": "n./v.", "meaning": "n. 展示，陈列；v. 显示，展现"}]}`;
+
+      const enrichContent = await callAPI([{
+        role: 'user',
+        content: enrichPrompt
+      }], 0.1);
+
+      const enriched = parseWordsJSON(enrichContent);
+      if (enriched.words && enriched.words.length > 0) {
+        // Merge enriched data back into allWords
+        const enrichMap = new Map();
+        for (const w of enriched.words) {
+          enrichMap.set(w.word.toLowerCase().trim(), w);
+        }
+        for (let i = 0; i < allWords.length; i++) {
+          const key = allWords[i].word.toLowerCase().trim();
+          const rich = enrichMap.get(key);
+          if (rich) {
+            allWords[i].phonetic = rich.phonetic || allWords[i].phonetic;
+            allWords[i].pos = rich.pos || allWords[i].pos;
+            allWords[i].meaning = rich.meaning || allWords[i].meaning;
+          }
+        }
+      }
+    } catch {
+      // Enrichment failure is non-fatal, keep original data
     }
 
     words = allWords;
