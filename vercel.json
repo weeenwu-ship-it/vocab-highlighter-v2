@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/api/recognize", "destination": "/api/recognize" }
+  ],
+  "functions": {
+    "api/recognize.js": {
+      "maxDuration": 60
+    }
+  }
+}
