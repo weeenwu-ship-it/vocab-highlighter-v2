@@ -4,220 +4,376 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>生词标注助手</title>
+<title>生词标注助手 - 此在教育</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #6C3CE1;
+  --primary-dark: #5528CC;
+  --primary-light: #EDE5FF;
+  --primary-ghost: #F8F5FF;
+  --bg: #F2F0F7;
+  --card: #FFFFFF;
+  --text-primary: #1A1A2E;
+  --text-secondary: #6B6B80;
+  --text-muted: #A0A0B2;
+  --border: #E8E6F0;
+  --accent-amber: #E8A820;
+  --accent-amber-bg: #FFF8E6;
+  --shadow-sm: 0 1px 3px rgba(108,60,225,0.06);
+  --shadow-md: 0 4px 16px rgba(108,60,225,0.08);
+  --shadow-lg: 0 8px 32px rgba(108,60,225,0.12);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: #f5f5f7;
-  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
+
+/* ===== Header ===== */
 header {
-  background: #fff;
-  border-bottom: 1px solid #e5e5ea;
-  padding: 12px 16px;
+  background: linear-gradient(135deg, #6C3CE1 0%, #8B5CF6 50%, #A78BFA 100%);
+  padding: 16px 20px;
   text-align: center;
   position: sticky;
   top: 0;
   z-index: 50;
+  box-shadow: 0 2px 12px rgba(108,60,225,0.25);
 }
-header h1 { font-size: 18px; font-weight: 600; color: #1d1d1f; }
+header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+header .brand {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 400;
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+
 main { flex: 1; display: flex; flex-direction: column; }
 
-/* Upload Page */
+/* ===== Pages ===== */
 .page { display: none; flex: 1; flex-direction: column; }
 .page.active { display: flex; }
 
+/* ===== Instructions Card ===== */
 .instructions {
-  background: #fff;
-  border-radius: 16px;
+  background: var(--card);
+  border-radius: var(--radius);
   padding: 20px;
   margin: 16px 16px 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
 }
-.instructions h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
-.step { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: 14px; color: #636366; }
+.instructions h2 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--text-primary);
+}
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
 .step-num {
-  width: 20px; height: 20px; border-radius: 50%;
-  background: #e8e0f7; color: #6930c3;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600; flex-shrink: 0; margin-top: 2px;
+  font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
 }
+.step-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--accent-amber-bg);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: #92700C;
+  line-height: 1.5;
+  border: 1px solid #F0DFA0;
+}
+.step-note svg { flex-shrink: 0; margin-top: 1px; }
 
+/* ===== Error ===== */
 .error-msg {
-  background: #fef2f2; border: 1px solid #fecaca;
-  border-radius: 12px; padding: 14px; margin: 0 16px 12px;
-  font-size: 14px; color: #dc2626;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin: 0 16px 12px;
+  font-size: 14px;
+  color: #DC2626;
 }
 
+/* ===== Upload Area ===== */
 .upload-area {
-  background: #fff;
-  border-radius: 16px;
+  background: var(--card);
+  border-radius: var(--radius);
   margin: 0 16px 16px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 .upload-zone {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  padding: 32px; cursor: pointer;
-  border: 2px dashed #e5e5ea; border-radius: 16px;
-  margin: 12px; transition: all 0.2s;
+  padding: 40px 32px; cursor: pointer;
+  border: 2px dashed #D4CCE8; border-radius: var(--radius);
+  margin: 12px; transition: all 0.3s ease;
+  background: var(--primary-ghost);
 }
 .upload-zone:hover, .upload-zone.dragover {
-  border-color: #6930c3; background: #f8f5ff;
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: scale(1.01);
 }
 .upload-zone input { display: none; }
 .camera-icon {
-  width: 64px; height: 64px; border-radius: 50%;
-  background: #e8e0f7; display: flex; align-items: center; justify-content: center;
-  margin-bottom: 16px;
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 16px rgba(108,60,225,0.3);
 }
-.camera-icon svg { width: 32px; height: 32px; color: #6930c3; }
-.upload-zone p { font-size: 15px; font-weight: 500; color: #3a3a3c; margin-bottom: 4px; }
-.upload-zone small { font-size: 13px; color: #aeaeb2; }
+.camera-icon svg { width: 34px; height: 34px; color: #fff; }
+.upload-zone p {
+  font-size: 16px; font-weight: 600;
+  color: var(--text-primary); margin-bottom: 6px;
+}
+.upload-zone small { font-size: 13px; color: var(--text-muted); }
 
-/* Preview - Thumbnail Grid */
+/* ===== Preview Thumbnails ===== */
 .preview-area { flex: 1; display: flex; flex-direction: column; }
 .preview-thumbs {
   flex: 1; padding: 12px; display: flex; flex-wrap: wrap;
-  gap: 8px; background: #f5f5f7; border-radius: 16px 16px 0 0;
+  gap: 8px; background: var(--bg); border-radius: var(--radius) var(--radius) 0 0;
   overflow-y: auto; align-content: flex-start;
 }
 .thumb-item {
   width: calc(33.33% - 6px); aspect-ratio: 3/4;
-  border-radius: 8px; overflow: hidden;
-  position: relative; background: #e5e5ea;
+  border-radius: var(--radius-sm); overflow: hidden;
+  position: relative; background: var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s;
 }
+.thumb-item:hover { transform: scale(1.03); }
 .thumb-item img { width: 100%; height: 100%; object-fit: cover; }
 .thumb-item .thumb-remove {
-  position: absolute; top: 4px; right: 4px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: rgba(0,0,0,0.6); color: #fff; border: none;
+  position: absolute; top: 6px; right: 6px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0,0,0,0.55); color: #fff; border: none;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 14px; line-height: 1;
+  font-size: 15px; line-height: 1;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s;
 }
+.thumb-item .thumb-remove:hover { background: rgba(220,38,38,0.8); }
 .thumb-item .thumb-idx {
-  position: absolute; bottom: 4px; left: 4px;
-  background: rgba(105,48,195,0.8); color: #fff;
-  font-size: 11px; padding: 1px 6px; border-radius: 4px;
+  position: absolute; bottom: 6px; left: 6px;
+  background: linear-gradient(135deg, rgba(108,60,225,0.85), rgba(139,92,246,0.85));
+  color: #fff; font-size: 11px; padding: 2px 8px;
+  border-radius: 6px; font-weight: 600;
+  backdrop-filter: blur(4px);
 }
 .preview-actions {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; background: #fff; border-top: 1px solid #f2f2f7;
+  padding: 12px 16px; background: var(--card);
+  border-top: 1px solid var(--border);
 }
 .btn-add {
-  padding: 8px 16px; background: #f8f5ff; color: #6930c3;
-  border: 1px solid #e8e0f7; border-radius: 8px;
-  font-size: 14px; font-weight: 500; cursor: pointer;
+  padding: 8px 18px;
+  background: var(--primary-ghost);
+  color: var(--primary);
+  border: 1.5px solid var(--primary-light);
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
 }
-.btn-add:hover { background: #e8e0f7; }
-.file-count { font-size: 13px; color: #8e8e93; }
+.btn-add:hover { background: var(--primary-light); border-color: var(--primary); }
+.file-count { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 
 .submit-wrap { padding: 16px; }
 .btn-primary {
-  width: 100%; padding: 14px; background: #6930c3; color: #fff;
-  border: none; border-radius: 12px; font-size: 15px; font-weight: 500;
-  cursor: pointer; transition: background 0.2s;
+  width: 100%; padding: 15px;
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 16px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 16px rgba(108,60,225,0.3);
+  letter-spacing: 0.3px;
 }
-.btn-primary:hover { background: #5b21b6; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:hover {
+  background: linear-gradient(135deg, #5528CC, #7C3AED);
+  box-shadow: 0 6px 24px rgba(108,60,225,0.4);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
-/* Processing Page */
+/* ===== Processing ===== */
 .processing {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; padding: 32px;
+  align-items: center; justify-content: center; padding: 40px;
+}
+.spinner-wrap {
+  position: relative;
+  width: 64px; height: 64px;
+  margin-bottom: 24px;
 }
 .spinner {
-  width: 48px; height: 48px; border: 3px solid #e5e5ea;
-  border-top-color: #6930c3; border-radius: 50%;
-  animation: spin 0.8s linear infinite; margin-bottom: 20px;
+  width: 64px; height: 64px;
+  border: 3px solid var(--primary-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.spinner-inner {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.processing p { font-size: 15px; color: #636366; }
+.processing p { font-size: 16px; color: var(--text-secondary); font-weight: 500; }
+.processing .detail { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
 
-/* Result Page */
+/* ===== Result Page ===== */
 .result-header {
-  padding: 12px 16px; background: #fff;
-  border-bottom: 1px solid #f2f2f7;
+  padding: 14px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
 }
-.result-header span { font-size: 14px; color: #8e8e93; }
-.result-header .count { font-weight: 600; color: #6930c3; }
+.result-header span { font-size: 14px; color: var(--text-secondary); }
+.result-header .count { font-weight: 700; color: var(--primary); font-size: 18px; }
 .result-header button {
-  font-size: 14px; color: #6930c3; font-weight: 500;
+  font-size: 14px; color: var(--primary); font-weight: 600;
   background: none; border: none; cursor: pointer;
+  padding: 6px 12px; border-radius: 8px;
+  transition: background 0.2s;
 }
+.result-header button:hover { background: var(--primary-ghost); }
+
 .word-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .word-card {
-  background: #fff; border-radius: 12px; padding: 16px;
-  margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s;
 }
+.word-card:hover { box-shadow: var(--shadow-md); }
 .word-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .word-info { flex: 1; min-width: 0; }
-.word-line { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-.word-idx { font-size: 12px; color: #aeaeb2; font-family: monospace; }
-.word-text { font-size: 16px; font-weight: 600; color: #1d1d1f; }
-.word-phonetic { font-size: 14px; color: #6930c3; font-family: monospace; }
+.word-line { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+.word-idx { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+.word-text { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+.word-phonetic { font-size: 14px; color: var(--primary); font-family: monospace; font-weight: 500; }
 .word-bottom { display: flex; align-items: baseline; gap: 8px; }
 .word-pos {
-  font-size: 12px; color: #d97706; background: #fffbeb;
-  padding: 2px 6px; border-radius: 4px; font-weight: 500;
+  font-size: 11px; color: var(--accent-amber);
+  background: var(--accent-amber-bg);
+  padding: 2px 8px; border-radius: 6px; font-weight: 600;
+  border: 1px solid #F0DFA0;
 }
-.word-meaning { font-size: 14px; color: #636366; }
+.word-meaning { font-size: 14px; color: var(--text-secondary); line-height: 1.4; }
 .word-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .word-actions button {
-  width: 32px; height: 32px; border-radius: 8px; border: none;
+  width: 34px; height: 34px; border-radius: 8px; border: none;
   background: none; cursor: pointer; display: flex;
-  align-items: center; justify-content: center; color: #aeaeb2;
+  align-items: center; justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.2s;
 }
-.word-actions button:hover { background: #f5f5f7; }
-.word-actions button.del:hover { background: #fef2f2; color: #ef4444; }
+.word-actions button:hover { background: var(--primary-ghost); color: var(--primary); }
+.word-actions button.del:hover { background: #FEF2F2; color: #EF4444; }
 
-/* Edit mode */
+/* ===== Edit mode ===== */
 .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.edit-grid label { font-size: 12px; color: #aeaeb2; display: block; margin-bottom: 4px; }
+.edit-grid label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 500; }
 .edit-grid input {
-  width: 100%; padding: 8px 12px; border: 1px solid #e5e5ea;
+  width: 100%; padding: 8px 12px;
+  border: 1.5px solid var(--border);
   border-radius: 8px; font-size: 14px; outline: none;
+  transition: all 0.2s;
 }
-.edit-grid input:focus { border-color: #6930c3; box-shadow: 0 0 0 2px rgba(105,48,195,0.15); }
+.edit-grid input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(108,60,225,0.12); }
 .btn-done {
-  width: 100%; padding: 10px; background: #6930c3; color: #fff;
-  border: none; border-radius: 8px; font-size: 14px; font-weight: 500;
+  width: 100%; padding: 10px;
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600;
   cursor: pointer; margin-top: 8px;
 }
 
-/* Export */
+/* ===== Export Bar ===== */
 .export-bar {
-  padding: 16px; background: #fff;
-  border-top: 1px solid #f2f2f7; display: flex; gap: 8px;
+  padding: 16px; background: var(--card);
+  border-top: 1px solid var(--border);
 }
 .btn-export {
-  flex: 1; padding: 12px; border: none; border-radius: 12px;
-  font-size: 13px; font-weight: 500; cursor: pointer; color: #fff;
+  width: 100%; padding: 14px;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer; color: #fff;
+  background: linear-gradient(135deg, #2563EB, #3B82F6);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+  transition: all 0.3s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
 }
-.btn-pdf { background: #6930c3; }
-.btn-pdf:hover { background: #5b21b6; }
-.btn-word { background: #2563eb; }
-.btn-word:hover { background: #1d4ed8; }
-.btn-excel { background: #059669; }
-.btn-excel:hover { background: #047857; }
-.btn-export:disabled { opacity: 0.5; }
+.btn-export:hover {
+  box-shadow: 0 6px 20px rgba(37,99,235,0.35);
+  transform: translateY(-1px);
+}
+.btn-export:active { transform: translateY(0); }
+.btn-export:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-export svg { width: 18px; height: 18px; }
+
+/* ===== Footer ===== */
+footer {
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
 </style>
 </head>
 <body>
 
-<header><h1>生词标注助手</h1></header>
+<header>
+  <h1>生词标注助手</h1>
+  <div class="brand">CIZAI EDUCATION</div>
+</header>
 
 <main>
   <!-- Upload Page -->
@@ -225,9 +381,13 @@ main { flex: 1; display: flex; flex-direction: column; }
     <div class="instructions">
       <h2>使用说明</h2>
       <div class="step"><span class="step-num">1</span><span>用荧光笔在英语试卷上标出不认识的生词</span></div>
-      <div class="step"><span class="step-num">2</span><span>拍照或从相册选择图片上传（支持多张）</span></div>
-      <div class="step"><span class="step-num">3</span><span>自动识别高亮单词，生成带音标和释义的生词表</span></div>
-      <div class="step"><span class="step-num">4</span><span>导出 PDF、Word 或 Excel 文件</span></div>
+      <div class="step"><span class="step-num">2</span><span>拍照或从相册选择图片上传（支持多张试卷）</span></div>
+      <div class="step"><span class="step-num">3</span><span>AI 自动识别高亮单词，生成带音标和释义的生词表</span></div>
+      <div class="step"><span class="step-num">4</span><span>检查结果后导出 Word 文件保存</span></div>
+      <div class="step-note">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="#E8A820"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 7a1 1 0 112 0v4a1 1 0 11-2 0V7zm1 8a1 1 0 100-2 1 1 0 000 2z"/></svg>
+        <span>每张图片识别约需 30-60 秒，请耐心等待，识别过程中请勿关闭页面。</span>
+      </div>
     </div>
     <div id="error-box" class="error-msg" style="display:none"></div>
     <div class="upload-area">
@@ -258,9 +418,12 @@ main { flex: 1; display: flex; flex-direction: column; }
   <!-- Processing Page -->
   <div id="page-processing" class="page">
     <div class="processing">
-      <div class="spinner"></div>
+      <div class="spinner-wrap">
+        <div class="spinner"></div>
+        <span class="spinner-inner">AI</span>
+      </div>
       <p id="processing-text">正在识别图片中的生词...</p>
-      <p id="processing-detail" style="font-size:13px;color:#aeaeb2;margin-top:8px;"></p>
+      <p class="detail" id="processing-detail"></p>
     </div>
   </div>
 
@@ -272,12 +435,15 @@ main { flex: 1; display: flex; flex-direction: column; }
     </div>
     <div class="word-list" id="word-list"></div>
     <div class="export-bar">
-      <button class="btn-export btn-pdf" id="export-pdf">PDF</button>
-      <button class="btn-export btn-word" id="export-word">Word</button>
-      <button class="btn-export btn-excel" id="export-excel">Excel</button>
+      <button class="btn-export" id="export-word">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        导出 Word 文件
+      </button>
     </div>
   </div>
 </main>
+
+<footer>此在教育出品 &middot; CIZAI EDUCATION</footer>
 
 <script>
 // ===== Configuration =====
@@ -447,19 +613,15 @@ function parseWordsJSON(content) {
 function mergeWords(pass1, pass2) {
   const seen = new Set();
   const merged = [];
-
   function normalizeKey(word) {
     return word.toLowerCase().trim().replace(/\s+/g, ' ');
   }
-
   const allWords = [...pass1, ...pass2];
-
   const singleWords = new Set();
   for (const w of allWords) {
     const parts = normalizeKey(w.word).split(' ');
     if (parts.length === 1) singleWords.add(parts[0]);
   }
-
   for (const w of allWords) {
     const key = normalizeKey(w.word);
     const parts = key.split(' ');
@@ -544,7 +706,7 @@ async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) 
   return mergeWords(pass1Words, pass2Words);
 }
 
-// ===== Submit & Multi-Image Recognition =====
+// ===== Submit =====
 $('submit-btn').addEventListener('click', async () => {
   if (selectedFiles.length === 0) return;
   hideError();
@@ -652,99 +814,6 @@ $('reset-btn').addEventListener('click', () => {
   showPage('upload');
 });
 
-// ===== ArrayBuffer to Base64 (chunk-safe) =====
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunks = [];
-  for (let i = 0; i < bytes.length; i += 8192) {
-    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-  }
-  return btoa(chunks.join(''));
-}
-
-// ===== Export PDF =====
-$('export-pdf').addEventListener('click', async () => {
-  if (words.length === 0) return;
-  const btn = $('export-pdf');
-  btn.disabled = true;
-  btn.textContent = '导出中...';
-
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-
-    let fontLoaded = false;
-    const fontURLs = [
-      'https://cdn.jsdelivr.net/gh/nicefan/font@main/SourceHanSansCN-Regular.ttf',
-      'https://fastly.jsdelivr.net/gh/nicefan/font@main/SourceHanSansCN-Regular.ttf',
-    ];
-    for (const fontURL of fontURLs) {
-      if (fontLoaded) break;
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        const fontRes = await fetch(fontURL, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (!fontRes.ok) continue;
-        const fontBuf = await fontRes.arrayBuffer();
-        const fontBase64 = arrayBufferToBase64(fontBuf);
-        doc.addFileToVFS('SourceHanSans.ttf', fontBase64);
-        doc.addFont('SourceHanSans.ttf', 'SourceHanSans', 'normal');
-        doc.setFont('SourceHanSans');
-        fontLoaded = true;
-      } catch {
-        // Try next CDN
-      }
-    }
-
-    const pageW = doc.internal.pageSize.getWidth();
-    let y = 20;
-
-    doc.setFontSize(18);
-    doc.text(fontLoaded ? '生词表' : 'Vocabulary List', pageW / 2, y, { align: 'center' });
-    y += 12;
-
-    doc.setFontSize(10);
-    doc.setTextColor(150);
-    const dateStr = new Date().toLocaleDateString('zh-CN');
-    doc.text(`${words.length} words · ${dateStr}`, pageW / 2, y, { align: 'center' });
-    doc.setTextColor(0);
-    y += 10;
-
-    doc.setFillColor(105, 48, 195);
-    doc.rect(15, y, pageW - 30, 8, 'F');
-    doc.setTextColor(255);
-    doc.setFontSize(10);
-    const headers = fontLoaded ? ['单词','音标','词性','释义'] : ['Word','Phonetic','POS','Meaning'];
-    doc.text(headers[0], 20, y + 5.5);
-    doc.text(headers[1], 65, y + 5.5);
-    doc.text(headers[2], 115, y + 5.5);
-    doc.text(headers[3], 135, y + 5.5);
-    doc.setTextColor(0);
-    y += 10;
-
-    words.forEach((w, i) => {
-      if (y > 275) { doc.addPage(); y = 20; }
-      if (i % 2 === 0) {
-        doc.setFillColor(248, 245, 255);
-        doc.rect(15, y - 4, pageW - 30, 8, 'F');
-      }
-      doc.setFontSize(10);
-      doc.text(w.word || '', 20, y);
-      doc.text(w.phonetic || '', 65, y);
-      doc.text(w.pos || '', 115, y);
-      doc.text(fontLoaded ? (w.meaning || '') : (w.meaning || '').replace(/[\u4e00-\u9fff]/g, '?'), 135, y);
-      y += 8;
-    });
-
-    doc.save(`vocab_${dateStr.replace(/\//g, '-')}.pdf`);
-  } catch (e) {
-    alert('PDF 导出失败: ' + e.message);
-  }
-  btn.disabled = false;
-  btn.textContent = 'PDF';
-});
-
 // ===== Export Word =====
 $('export-word').addEventListener('click', () => {
   if (words.length === 0) return;
@@ -755,20 +824,22 @@ xmlns:w="urn:schemas-microsoft-com:office:word"
 xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8">
 <style>
-  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
-  h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 4px; }
-  .sub { text-align: center; color: #999; font-size: 12px; margin-bottom: 16px; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif; margin: 40px; }
+  h1 { text-align: center; color: #1a1a2e; font-size: 24px; margin-bottom: 4px; }
+  .sub { text-align: center; color: #888; font-size: 12px; margin-bottom: 20px; }
+  .brand { text-align: center; color: #6C3CE1; font-size: 11px; margin-bottom: 24px; letter-spacing: 2px; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #6930c3; color: #fff; padding: 8px 12px; font-size: 13px; text-align: left; }
-  td { padding: 6px 12px; font-size: 13px; border-bottom: 1px solid #eee; }
+  th { background: #6C3CE1; color: #fff; padding: 10px 14px; font-size: 14px; text-align: left; }
+  td { padding: 8px 14px; font-size: 13px; border-bottom: 1px solid #e8e6f0; }
   tr:nth-child(even) td { background: #f8f5ff; }
-  .word { font-weight: 600; }
-  .phonetic { color: #6930c3; font-family: monospace; }
-  .pos { color: #d97706; }
+  .word { font-weight: bold; font-size: 14px; }
+  .phonetic { color: #6C3CE1; font-family: "Consolas", monospace; }
+  .pos { color: #d97706; font-weight: bold; }
 </style></head>
 <body>
 <h1>生词表</h1>
-<p class="sub">共 ${words.length} 个单词 · ${dateStr}</p>
+<p class="sub">共 ${words.length} 个单词 &middot; ${dateStr}</p>
+<p class="brand">此在教育 CIZAI EDUCATION</p>
 <table>
 <tr><th>序号</th><th>单词</th><th>音标</th><th>词性</th><th>释义</th></tr>
 ${words.map((w, i) => `<tr>
@@ -788,19 +859,6 @@ ${words.map((w, i) => `<tr>
   a.download = `生词表_${dateStr.replace(/\//g, '-')}.doc`;
   a.click();
   URL.revokeObjectURL(url);
-});
-
-// ===== Export Excel =====
-$('export-excel').addEventListener('click', () => {
-  if (words.length === 0) return;
-  const data = [['序号', '单词', '音标', '词性', '释义']];
-  words.forEach((w, i) => data.push([i + 1, w.word, w.phonetic, w.pos, w.meaning]));
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 20 }, { wch: 8 }, { wch: 30 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '生词表');
-  XLSX.writeFile(wb, `生词表_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.xlsx`);
 });
 </script>
 </body>
