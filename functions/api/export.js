@@ -1,7 +1,22 @@
-export async function onRequestPost(context) {
+// Support both GET (WeChat redirect) and POST (direct browser)
+export async function onRequest(context) {
   try {
-    const formData = await context.request.formData();
-    const raw = formData.get('data');
+    let raw;
+    if (context.request.method === 'GET') {
+      const url = new URL(context.request.url);
+      const encoded = url.searchParams.get('d');
+      if (!encoded) {
+        // No data - redirect to homepage
+        return Response.redirect(new URL('/', context.request.url).toString(), 302);
+      }
+      // Decode: URL-safe base64 -> JSON
+      const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      raw = decodeURIComponent(escape(atob(b64)));
+    } else {
+      const formData = await context.request.formData();
+      raw = formData.get('data');
+    }
+
     if (!raw) {
       return new Response('Missing data', { status: 400 });
     }
