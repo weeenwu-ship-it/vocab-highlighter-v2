@@ -583,6 +583,16 @@ $('reset-btn').addEventListener('click', () => {
   showPage('upload');
 });
 
+// ===== ArrayBuffer to Base64 (chunk-safe) =====
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += 8192) {
+    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+  }
+  return btoa(chunks.join(''));
+}
+
 // ===== Export PDF =====
 $('export-pdf').addEventListener('click', async () => {
   if (words.length === 0) return;
@@ -594,28 +604,42 @@ $('export-pdf').addEventListener('click', async () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-    // Load Chinese font
-    try {
-      const fontRes = await fetch('https://cdn.jsdelivr.net/gh/nicefan/font@main/SourceHanSansCN-Regular.ttf');
-      const fontBuf = await fontRes.arrayBuffer();
-      const fontBase64 = btoa(String.fromCharCode(...new Uint8Array(fontBuf)));
-      doc.addFileToVFS('SourceHanSans.ttf', fontBase64);
-      doc.addFont('SourceHanSans.ttf', 'SourceHanSans', 'normal');
-      doc.setFont('SourceHanSans');
-    } catch {
-      // Fallback without Chinese font
+    // Load Chinese font with timeout and multiple CDN fallbacks
+    let fontLoaded = false;
+    const fontURLs = [
+      'https://cdn.jsdelivr.net/gh/nicefan/font@main/SourceHanSansCN-Regular.ttf',
+      'https://fastly.jsdelivr.net/gh/nicefan/font@main/SourceHanSansCN-Regular.ttf',
+    ];
+    for (const fontURL of fontURLs) {
+      if (fontLoaded) break;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        const fontRes = await fetch(fontURL, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!fontRes.ok) continue;
+        const fontBuf = await fontRes.arrayBuffer();
+        const fontBase64 = arrayBufferToBase64(fontBuf);
+        doc.addFileToVFS('SourceHanSans.ttf', fontBase64);
+        doc.addFont('SourceHanSans.ttf', 'SourceHanSans', 'normal');
+        doc.setFont('SourceHanSans');
+        fontLoaded = true;
+      } catch {
+        // Try next CDN
+      }
     }
 
     const pageW = doc.internal.pageSize.getWidth();
     let y = 20;
 
     doc.setFontSize(18);
-    doc.text('生词表', pageW / 2, y, { align: 'center' });
+    doc.text(fontLoaded ? '生词表' : 'Vocabulary List', pageW / 2, y, { align: 'center' });
     y += 12;
 
     doc.setFontSize(10);
     doc.setTextColor(150);
-    doc.text(`共 ${words.length} 个单词 · ${new Date().toLocaleDateString('zh-CN')}`, pageW / 2, y, { align: 'center' });
+    const dateStr = new Date().toLocaleDateString('zh-CN');
+    doc.text(`${words.length} words · ${dateStr}`, pageW / 2, y, { align: 'center' });
     doc.setTextColor(0);
     y += 10;
 
@@ -624,10 +648,11 @@ $('export-pdf').addEventListener('click', async () => {
     doc.rect(15, y, pageW - 30, 8, 'F');
     doc.setTextColor(255);
     doc.setFontSize(10);
-    doc.text('单词', 20, y + 5.5);
-    doc.text('音标', 65, y + 5.5);
-    doc.text('词性', 115, y + 5.5);
-    doc.text('释义', 135, y + 5.5);
+    const headers = fontLoaded ? ['单词','音标','词性','释义'] : ['Word','Phonetic','POS','Meaning'];
+    doc.text(headers[0], 20, y + 5.5);
+    doc.text(headers[1], 65, y + 5.5);
+    doc.text(headers[2], 115, y + 5.5);
+    doc.text(headers[3], 135, y + 5.5);
     doc.setTextColor(0);
     y += 10;
 
@@ -641,13 +666,13 @@ $('export-pdf').addEventListener('click', async () => {
       doc.text(w.word || '', 20, y);
       doc.text(w.phonetic || '', 65, y);
       doc.text(w.pos || '', 115, y);
-      doc.text(w.meaning || '', 135, y);
+      doc.text(fontLoaded ? (w.meaning || '') : (w.meaning || '').replace(/[\u4e00-\u9fff]/g, '?'), 135, y);
       y += 8;
     });
 
-    doc.save(`生词表_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`);
+    doc.save(`vocab_${dateStr.replace(/\//g, '-')}.pdf`);
   } catch (e) {
-    alert('PDF 导出失败: ' + e.message);
+    alert('PDF export failed: ' + e.message);
   }
   btn.disabled = false;
   btn.textContent = '导出 PDF';
