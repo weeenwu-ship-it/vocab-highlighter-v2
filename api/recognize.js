@@ -27,7 +27,7 @@ export default async function handler(req, res) {
           model: body.model || 'ernie-4.5-turbo-vl',
           messages: body.messages,
           max_tokens: body.max_tokens || 16000,
-          temperature: body.temperature ?? 0,
+          temperature: body.temperature ?? 0.3,
         }),
       }
     );

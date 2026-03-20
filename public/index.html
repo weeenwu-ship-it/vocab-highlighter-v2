@@ -237,7 +237,8 @@ main { flex: 1; display: flex; flex-direction: column; }
   <div id="page-processing" class="page">
     <div class="processing">
       <div class="spinner"></div>
-      <p>正在识别图片中的生词...</p>
+      <p id="processing-text">正在识别图片中的生词...</p>
+      <p id="processing-detail" style="font-size:13px;color:#aeaeb2;margin-top:8px;"></p>
     </div>
   </div>
 
@@ -346,18 +347,104 @@ function showError(msg) {
 }
 function hideError() { errorBox.style.display = 'none'; }
 
-// ===== Submit & API Call =====
+// ===== API Helper =====
+async function callAPI(messages, temp = 0.3) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      max_tokens: 16000,
+      temperature: temp,
+    }),
+  });
+
+  clearTimeout(timeout);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.errorMsg || '识别服务异常（' + res.status + '）');
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+function parseWordsJSON(content) {
+  try {
+    return JSON.parse(content);
+  } catch {
+    const m = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*"words"[\s\S]*\})/);
+    if (m) return JSON.parse(m[1].trim());
+    throw new Error('识别结果解析失败');
+  }
+}
+
+function mergeWords(pass1, pass2) {
+  const seen = new Set();
+  const merged = [];
+
+  // Normalize: split phrases into individual words for dedup
+  function normalizeKey(word) {
+    return word.toLowerCase().trim().replace(/\s+/g, ' ');
+  }
+
+  // First, collect all individual words from both passes
+  const allWords = [...pass1, ...pass2];
+
+  // Filter out multi-word phrases if we already have the individual word
+  const singleWords = new Set();
+  for (const w of allWords) {
+    const parts = normalizeKey(w.word).split(' ');
+    if (parts.length === 1) singleWords.add(parts[0]);
+  }
+
+  for (const w of allWords) {
+    const key = normalizeKey(w.word);
+    const parts = key.split(' ');
+
+    // Skip multi-word entries if any individual word already exists
+    if (parts.length > 1 && parts.some(p => singleWords.has(p))) continue;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(w);
+    }
+  }
+  return merged;
+}
+
+// ===== Submit & Two-Pass Recognition =====
 $('submit-btn').addEventListener('click', async () => {
   if (!selectedFile) return;
   hideError();
   showPage('processing');
 
-  try {
-    const base64 = await compressImage(selectedFile);
+  const statusText = $('processing-text');
+  const detailText = $('processing-detail');
 
-    const prompt = `看这张英语试卷照片。有些英文单词被荧光笔涂过了（单词上有一层彩色覆盖，可能是粉红色、黄色、绿色等）。
+  try {
+    statusText.textContent = '正在压缩图片...';
+    detailText.textContent = '';
+    const base64 = await compressImage(selectedFile);
+    const imageContent = [
+      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
+    ];
+
+    // === Pass 1: Full scan ===
+    statusText.textContent = '第 1/2 轮：正在识别生词...';
+    detailText.textContent = '全面扫描试卷中的高亮标注';
+
+    const prompt1 = `看这张英语试卷照片。有些英文单词被荧光笔涂过了（单词上有一层彩色覆盖，可能是粉红色、黄色、绿色等）。
 
 请找出所有被荧光笔标记的单词。从试卷顶部开始，一行一行往下仔细看，列出每一个被彩色荧光笔标记覆盖的英文单词。被标记的单词可能有15-30个，请不要遗漏。
+
+注意：只列出单个英文单词，不要列出词组或短语。
 
 为每个单词提供：音标（IPA）、词性（n./v./adj./adv.等）、中文释义（最常用的1-2个含义）。
 
@@ -366,53 +453,53 @@ $('submit-btn').addEventListener('click', async () => {
 
 如果没有找到任何标记的单词：{"words": []}`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const content1 = await callAPI([{
+      role: 'user',
+      content: [...imageContent, { type: 'text', text: prompt1 }]
+    }]);
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }
-          ]
-        }],
-        max_tokens: 16000,
-        temperature: 0,
-      }),
-    });
-
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.errorMsg || '识别服务异常（' + res.status + '）');
-    }
-
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content || '';
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const m = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*"words"[\s\S]*\})/);
-      if (m) parsed = JSON.parse(m[1].trim());
-      else throw new Error('识别结果解析失败');
-    }
-
-    if (!parsed.words || parsed.words.length === 0) {
+    const parsed1 = parseWordsJSON(content1);
+    if (!parsed1.words || parsed1.words.length === 0) {
       throw new Error('未识别到高亮标注的单词，请确认图片中有用荧光笔标注的英文单词');
     }
 
-    words = parsed.words;
+    const pass1Words = parsed1.words;
+
+    // === Pass 2: Different angle scan ===
+    statusText.textContent = '第 2/2 轮：复查中...';
+    detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在交叉复查`;
+
+    const prompt2 = `仔细看这张英语试卷照片。找出所有被粉红色或彩色荧光笔标记的英文单词。
+
+重点检查区域：
+1. 文章正文段落中被荧光笔覆盖的单词
+2. 表格中被荧光笔标记的单词
+3. 题目选项中被荧光笔标记的单词
+4. 所有有彩色覆盖层的单词，包括颜色较淡的
+
+注意：只列出单个英文单词，不要列出词组或短语。
+
+每个单词给出音标（IPA）、词性和中文释义。
+
+纯JSON输出：
+{"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
+
+    let pass2Words = [];
+    try {
+      const content2 = await callAPI([{
+        role: 'user',
+        content: [...imageContent, { type: 'text', text: prompt2 }]
+      }]);
+      const parsed2 = parseWordsJSON(content2);
+      pass2Words = parsed2.words || [];
+    } catch {
+      // Pass 2 failure is non-fatal
+    }
+
+    // === Merge results (union + dedup) ===
+    words = mergeWords(pass1Words, pass2Words);
+    const added = words.length - new Set(pass1Words.map(w => w.word.toLowerCase().trim())).size;
+
     renderWords();
     showPage('result');
   } catch (err) {
