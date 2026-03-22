@@ -448,7 +448,7 @@ footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
 <script>
 // ===== Configuration =====
 const API_URL = '/api/recognize';
-const MODEL = 'qwen-vl-max';  // 切回百度: 'ernie-4.5-turbo-vl'
+const MODEL = 'ernie-4.5-turbo-vl';  // 备选: 'qwen-vl-max'
 
 // ===== State =====
 let selectedFiles = [];
@@ -681,7 +681,17 @@ const PROMPT2 = `仔细复查这张英语试卷照片，找出所有被荧光笔
 只看视觉标记，不做语义筛选。每个单词或短语给出音标（IPA）、词性和中文释义。纯JSON输出：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
 
-// ===== Process single image (two-pass) =====
+const PROMPT3 = `再看一遍这张英语试卷照片。找出所有被荧光笔（彩色覆盖层）标记的英文单词，尽可能多地找出来。
+
+这次重点关注容易遗漏的区域：
+- 正文中颜色较淡的标记、行首行尾的标记、跨行的短语
+- 选项区中非正确答案选项上的荧光笔标记（A/B/C/D都要看）
+
+只看视觉标记，不做语义判断。相邻标记词如构成固定短语可整体列出。
+每个词给出音标（IPA）、词性和中文释义。纯JSON输出：
+{"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
+
+// ===== Process single image (three-pass) =====
 async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) {
   const prefix = totalImgs > 1 ? `图片 ${imgIdx}/${totalImgs}` : '';
 
@@ -689,12 +699,14 @@ async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) 
   detailText.textContent = '';
   const base64 = await compressImage(file, 1280, 0.6);
   const base64Small = await compressImage(file, 1024, 0.5);
+  const base64Mid = await compressImage(file, 1152, 0.55);
 
   const imageContent = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }];
   const imageContentSmall = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Small}` } }];
+  const imageContentMid = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Mid}` } }];
 
   // Pass 1
-  statusText.textContent = prefix ? `${prefix} - 第 1/2 轮识别中...` : '第 1/2 轮：正在识别生词...';
+  statusText.textContent = prefix ? `${prefix} - 第 1/3 轮识别中...` : '第 1/3 轮：正在识别生词...';
   detailText.textContent = '全面扫描试卷中的高亮标注';
 
   const content1 = await callAPI([{
@@ -706,7 +718,7 @@ async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) 
   const pass1Words = parsed1.words || [];
 
   // Pass 2
-  statusText.textContent = prefix ? `${prefix} - 第 2/2 轮复查中...` : '第 2/2 轮：复查中...';
+  statusText.textContent = prefix ? `${prefix} - 第 2/3 轮复查中...` : '第 2/3 轮：复查中...';
   detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在交叉复查`;
 
   let pass2Words = [];
@@ -721,7 +733,25 @@ async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) 
     // Pass 2 failure is non-fatal
   }
 
-  return mergeWords(pass1Words, pass2Words);
+  const merged12 = mergeWords(pass1Words, pass2Words);
+
+  // Pass 3
+  statusText.textContent = prefix ? `${prefix} - 第 3/3 轮补漏中...` : '第 3/3 轮：补漏扫描...';
+  detailText.textContent = `前两轮共找到 ${merged12.length} 个词，正在补漏`;
+
+  let pass3Words = [];
+  try {
+    const content3 = await callAPI([{
+      role: 'user',
+      content: [...imageContentMid, { type: 'text', text: PROMPT3 }]
+    }], 0.4);
+    const parsed3 = parseWordsJSON(content3);
+    pass3Words = parsed3.words || [];
+  } catch {
+    // Pass 3 failure is non-fatal
+  }
+
+  return mergeWords(merged12, pass3Words);
 }
 
 // ===== Submit =====
