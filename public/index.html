@@ -303,7 +303,7 @@ main { flex: 1; display: flex; flex-direction: column; }
   padding: 2px 8px; border-radius: 6px; font-weight: 600;
   border: 1px solid #F0DFA0;
 }
-.word-meaning { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+.word-meaning { font-size: 14px; color: var(--text-secondary); line-height: 1.4; }
 .word-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .word-actions button {
   width: 34px; height: 34px; border-radius: 8px; border: none;
@@ -372,7 +372,7 @@ footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
 
 <header>
   <h1>生词标注助手</h1>
-  <div class="brand">CIZAI EDUCATION</div>
+  <div class="brand">Dasein Education</div>
 </header>
 
 <main>
@@ -443,7 +443,7 @@ footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
   </div>
 </main>
 
-<footer>此在教育出品 &middot; CIZAI EDUCATION</footer>
+<footer>此在教育出品 &middot; Dasein Education</footer>
 
 <script>
 // ===== Configuration =====
@@ -640,15 +640,8 @@ function mergeWords(pass1, pass2) {
     return word.toLowerCase().trim().replace(/\s+/g, ' ');
   }
   const allWords = [...pass1, ...pass2];
-  const singleWords = new Set();
-  for (const w of allWords) {
-    const parts = normalizeKey(w.word).split(' ');
-    if (parts.length === 1) singleWords.add(parts[0]);
-  }
   for (const w of allWords) {
     const key = normalizeKey(w.word);
-    const parts = key.split(' ');
-    if (parts.length > 1 && parts.some(p => singleWords.has(p))) continue;
     if (!seen.has(key)) {
       seen.add(key);
       merged.push(w);
@@ -662,9 +655,9 @@ const PROMPT1 = `看这张英语试卷照片。有些英文单词被荧光笔涂
 
 请找出所有被荧光笔标记的单词。从试卷顶部开始，一行一行往下仔细看，列出每一个被彩色荧光笔标记覆盖的英文单词。被标记的单词可能有15-30个，请不要遗漏。
 
-注意：只列出单个英文单词，不要列出词组或短语。
+请同时列出单个单词和短语（如 look forward to、take part in 等）。如果荧光笔标记覆盖了连续的多个词，请作为一个短语整体列出。
 
-为每个单词提供：音标（IPA）、词性（n./v./adj./adv.等）、中文释义（最常用的1-2个含义）。
+为每个单词或短语提供：音标（IPA）、词性（n./v./adj./adv./phr.等）、中文释义（最常用的1-2个含义）。
 
 输出纯JSON格式，不要其他文字：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}
@@ -679,9 +672,9 @@ const PROMPT2 = `仔细看这张英语试卷照片。找出所有被粉红色或
 3. 题目选项中被荧光笔标记的单词
 4. 所有有彩色覆盖层的单词，包括颜色较淡的
 
-注意：只列出单个英文单词，不要列出词组或短语。
+请同时列出单个单词和短语。如果荧光笔标记覆盖了连续的多个词，请作为一个短语整体列出。
 
-每个单词给出音标（IPA）、词性和中文释义。
+每个单词或短语给出音标（IPA）、词性（含 phr. 表示短语）和中文释义。
 
 纯JSON输出：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
@@ -755,51 +748,6 @@ $('submit-btn').addEventListener('click', async () => {
 
     if (allWords.length === 0) {
       throw new Error('所有图片均未识别到高亮标注的单词');
-    }
-
-    // === Enrichment pass: get all common POS & meanings ===
-    statusText.textContent = '正在丰富词义...';
-    detailText.textContent = `为 ${allWords.length} 个单词补充完整词性和释义`;
-
-    try {
-      const wordList = allWords.map(w => w.word).join(', ');
-      const enrichPrompt = `以下是一组英语单词，请为每个单词提供详细的词典信息。
-
-要求：
-1. 列出该单词所有常见词性（n./v./adj./adv./prep.等）及对应的中文释义
-2. 每个词性给出1-2个最常用的含义
-3. 不同词性之间用分号（；）分隔
-4. 格式示例：n. 展示，陈列；v. 显示，展现
-
-单词列表：${wordList}
-
-输出纯JSON格式，不要其他文字：
-{"words": [{"word": "display", "phonetic": "/dɪˈspleɪ/", "pos": "n./v.", "meaning": "n. 展示，陈列；v. 显示，展现"}]}`;
-
-      const enrichContent = await callAPI([{
-        role: 'user',
-        content: enrichPrompt
-      }], 0.1);
-
-      const enriched = parseWordsJSON(enrichContent);
-      if (enriched.words && enriched.words.length > 0) {
-        // Merge enriched data back into allWords
-        const enrichMap = new Map();
-        for (const w of enriched.words) {
-          enrichMap.set(w.word.toLowerCase().trim(), w);
-        }
-        for (let i = 0; i < allWords.length; i++) {
-          const key = allWords[i].word.toLowerCase().trim();
-          const rich = enrichMap.get(key);
-          if (rich) {
-            allWords[i].phonetic = rich.phonetic || allWords[i].phonetic;
-            allWords[i].pos = rich.pos || allWords[i].pos;
-            allWords[i].meaning = rich.meaning || allWords[i].meaning;
-          }
-        }
-      }
-    } catch {
-      // Enrichment failure is non-fatal, keep original data
     }
 
     words = allWords;
