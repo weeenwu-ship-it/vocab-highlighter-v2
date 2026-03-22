@@ -386,7 +386,7 @@ footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
       <div class="step"><span class="step-num">4</span><span>检查结果后导出 Word 文件保存</span></div>
       <div class="step-note">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="#E8A820"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 7a1 1 0 112 0v4a1 1 0 11-2 0V7zm1 8a1 1 0 100-2 1 1 0 000 2z"/></svg>
-        <span>每张图片识别约需 30-60 秒，请耐心等待，识别过程中请勿关闭页面。</span>
+        <span>图片会自动裁切为正文区和选项区分别识别，每张约需 20-40 秒。</span>
       </div>
     </div>
     <div id="error-box" class="error-msg" style="display:none"></div>
@@ -485,6 +485,53 @@ function compressImage(file, maxSize = 2048, quality = 0.85) {
         reader.onload = () => resolve(reader.result.split(',')[1]);
         reader.readAsDataURL(blob);
       }, 'image/jpeg', quality);
+    };
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// ===== Image Cropping (split into regions) =====
+function cropAndCompress(file, splitRatio = 0.5, maxSize = 1280, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+      const splitY = Math.round(height * splitRatio);
+
+      function compressCanvas(canvas) {
+        let w = canvas.width, h = canvas.height;
+        if (w > maxSize || h > maxSize) {
+          const r = Math.min(maxSize / w, maxSize / h);
+          const resized = document.createElement('canvas');
+          resized.width = Math.round(w * r);
+          resized.height = Math.round(h * r);
+          resized.getContext('2d').drawImage(canvas, 0, 0, resized.width, resized.height);
+          canvas = resized;
+        }
+        return new Promise((res, rej) => {
+          canvas.toBlob(blob => {
+            if (!blob) return rej(new Error('裁切压缩失败'));
+            const reader = new FileReader();
+            reader.onload = () => res(reader.result.split(',')[1]);
+            reader.readAsDataURL(blob);
+          }, 'image/jpeg', quality);
+        });
+      }
+
+      const topCanvas = document.createElement('canvas');
+      topCanvas.width = width;
+      topCanvas.height = splitY;
+      topCanvas.getContext('2d').drawImage(img, 0, 0, width, splitY, 0, 0, width, splitY);
+
+      const botCanvas = document.createElement('canvas');
+      botCanvas.width = width;
+      botCanvas.height = height - splitY;
+      botCanvas.getContext('2d').drawImage(img, 0, splitY, width, height - splitY, 0, 0, width, height - splitY);
+
+      Promise.all([compressCanvas(topCanvas), compressCanvas(botCanvas)])
+        .then(([top, bottom]) => resolve({ top, bottom }))
+        .catch(reject);
     };
     img.onerror = () => reject(new Error('图片加载失败'));
     img.src = URL.createObjectURL(file);
@@ -633,25 +680,6 @@ function parseWordsJSON(content) {
   throw new Error('识别结果解析失败，请重试');
 }
 
-function parseFeedbackJSON(content) {
-  // Try direct parse
-  try { const r = JSON.parse(content); if (r.add) return r; } catch {}
-
-  // Try extracting from markdown code block
-  const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlock) {
-    try { const r = JSON.parse(codeBlock[1].trim()); if (r.add) return r; } catch {}
-  }
-
-  // Try extracting the {"add": [...], "remove": [...]} structure
-  const jsonMatch = content.match(/\{\s*"add"\s*:\s*\[[\s\S]*?\]\s*,\s*"remove"\s*:\s*\[[\s\S]*?\]\s*\}/);
-  if (jsonMatch) {
-    try { return JSON.parse(jsonMatch[0]); } catch {}
-  }
-
-  return { add: [], remove: [] };
-}
-
 function mergeWords(pass1, pass2) {
   const seen = new Set();
   const merged = [];
@@ -669,19 +697,15 @@ function mergeWords(pass1, pass2) {
   return merged;
 }
 
-// ===== Prompts =====
-const PROMPT1 = `看这张英语试卷照片。有些英文单词被荧光笔涂过了（单词上有一层彩色覆盖，可能是粉红色、黄色、绿色等）。
+// ===== Prompts (region-specific) =====
+const PROMPT_ARTICLE = `这是一张英语试卷的文章正文部分（已从原图裁切）。有些英文单词被荧光笔涂过了（单词上有一层彩色覆盖，可能是粉红色、黄色、绿色等）。
 
-请找出所有被荧光笔标记的单词，可能有15-30个甚至更多，请不要遗漏任何一个。
-
-扫描顺序——必须按此顺序逐行检查，确保不遗漏：
-1. 先看文章正文：从第一行开始，逐行扫描正文段落，找出每一个有荧光笔覆盖的单词或短语
-2. 再看选项区：逐题检查A/B/C/D每个选项，只要有荧光笔覆盖就列出，不论是否为正确答案
+请找出这部分图片中所有被荧光笔标记的单词，从第一行开始逐行扫描，不要遗漏任何一个。
 
 重要原则：
 - 只根据视觉判断（有无彩色覆盖层），不做语义筛选
 - 学生标记了就列出，不要跳过任何一个
-- 相邻被标记词如构成固定短语（如give up, a couple of, in an instant），可作为整体列出；否则分别列出
+- 相邻被标记词如构成固定短语（如drew near, emptying out），可作为整体列出；否则分别列出
 
 为每个单词或短语提供：音标（IPA）、词性（n./v./adj./adv./phr.等）、中文释义。
 
@@ -690,108 +714,59 @@ const PROMPT1 = `看这张英语试卷照片。有些英文单词被荧光笔涂
 
 如果没有找到任何标记的单词：{"words": []}`;
 
-// Pass 2 template: feedback-based review using Pass 1 results
-function buildPrompt2(pass1Words) {
-  const wordList = pass1Words.map(w => w.word).join(', ');
-  return `我刚才扫描了这张英语试卷中被荧光笔标记的单词，找到了以下 ${pass1Words.length} 个：
-${wordList}
+const PROMPT_OPTIONS = `这是一张英语试卷的选择题选项部分（已从原图裁切）。有些选项被荧光笔涂过了（文字上有一层彩色覆盖）。
 
-请你重新仔细看这张图片，对照我的结果进行查漏补缺：
+请逐题检查每道题的 A/B/C/D 每个选项，找出所有被荧光笔标记的选项词。不论是否为正确答案，只要有荧光笔覆盖就列出。
 
-1. 检查我是否遗漏了被荧光笔标记的单词——特别注意：
-   - 正文中颜色较淡或较小的标记
-   - 选项区中被标记但我没列出的选项（A/B/C/D每个都要看）
-   - 行首、行尾容易被忽略的标记
+重要原则：
+- 只根据视觉判断（有无彩色覆盖层），不做语义筛选
+- 每道题的每个选项都要逐一检查
+- 学生标记了就列出，不要跳过任何一个
 
-2. 检查我是否有误判——把没有荧光笔标记的单词错误地列入了
+为每个单词或短语提供：音标（IPA）、词性（n./v./adj./adv./phr.等）、中文释义。
 
-请输出你发现的所有遗漏词（新增的），以及误判的词（需要删除的）。
+纯JSON输出，不要其他文字：
+{"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}
 
-纯JSON输出：
-{"add": [{"word": "xxx", "phonetic": "/xxx/", "pos": "n.", "meaning": "xxx"}], "remove": ["误判的词"]}
+如果没有找到任何标记的单词：{"words": []}`;
 
-如果没有需要修改的：{"add": [], "remove": []}`;
-}
-
-const PROMPT3 = `请仔细观察这张英语试卷照片中的颜色。
-
-试卷上有些文字被荧光笔覆盖了——这些文字上面有一层半透明的彩色（粉红色、黄色、绿色、蓝色等），和普通的黑色印刷文字明显不同。
-
-请你逐行检查整个试卷（包括正文和下方的选项区），找出所有被彩色覆盖的英文单词。
-
-注意区分：
-- 有荧光笔标记的文字：文字上方有一层彩色覆盖，颜色和周围的黑字不同
-- 没有标记的文字：纯黑色印刷，没有彩色覆盖
-
-只列出你确定有彩色覆盖的单词。每个单词给出音标（IPA）、词性和中文释义。
-
-纯JSON输出：
-{"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
-
-// ===== Process single image (three-pass) =====
+// ===== Process single image (region-split) =====
 async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) {
   const prefix = totalImgs > 1 ? `图片 ${imgIdx}/${totalImgs}` : '';
 
-  statusText.textContent = prefix ? `${prefix} - 压缩中...` : '正在压缩图片...';
-  detailText.textContent = '';
-  const base64 = await compressImage(file, 1280, 0.6);
-  const base64Small = await compressImage(file, 1024, 0.5);
-  const base64Mid = await compressImage(file, 1152, 0.55);
+  // Step 1: Crop image into article (top) and options (bottom)
+  statusText.textContent = prefix ? `${prefix} - 裁切图片中...` : '正在裁切图片...';
+  detailText.textContent = '将试卷分为正文区和选项区分别识别';
+  const { top, bottom } = await cropAndCompress(file, 0.5, 1280, 0.75);
 
-  const imageContent = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } }];
-  const imageContentSmall = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Small}` } }];
-  const imageContentMid = [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Mid}` } }];
+  // Step 2: Recognize article region (top half)
+  statusText.textContent = prefix ? `${prefix} - 识别正文区 (1/2)...` : '第 1/2 步：识别正文区...';
+  detailText.textContent = '正在扫描文章正文中的高亮标注';
 
-  // Pass 1
-  statusText.textContent = prefix ? `${prefix} - 第 1/3 轮识别中...` : '第 1/3 轮：正在识别生词...';
-  detailText.textContent = '全面扫描试卷中的高亮标注';
-
-  const content1 = await callAPI([{
+  const topContent = await callAPI([{
     role: 'user',
-    content: [...imageContent, { type: 'text', text: PROMPT1 }]
+    content: [
+      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${top}` } },
+      { type: 'text', text: PROMPT_ARTICLE }
+    ]
   }]);
+  const topWords = (parseWordsJSON(topContent).words || []);
 
-  const parsed1 = parseWordsJSON(content1);
-  const pass1Words = parsed1.words || [];
+  // Step 3: Recognize options region (bottom half)
+  statusText.textContent = prefix ? `${prefix} - 识别选项区 (2/2)...` : '第 2/2 步：识别选项区...';
+  detailText.textContent = `正文区找到 ${topWords.length} 个词，正在扫描选项区`;
 
-  // Pass 2: Feedback-based review
-  statusText.textContent = prefix ? `${prefix} - 第 2/3 轮查漏补缺...` : '第 2/3 轮：查漏补缺...';
-  detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在对照复查`;
+  const botContent = await callAPI([{
+    role: 'user',
+    content: [
+      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${bottom}` } },
+      { type: 'text', text: PROMPT_OPTIONS }
+    ]
+  }]);
+  const botWords = (parseWordsJSON(botContent).words || []);
 
-  let afterFeedback = [...pass1Words];
-  try {
-    const prompt2 = buildPrompt2(pass1Words);
-    const content2 = await callAPI([{
-      role: 'user',
-      content: [...imageContentSmall, { type: 'text', text: prompt2 }]
-    }]);
-    const feedback = parseFeedbackJSON(content2);
-    const toRemove = new Set((feedback.remove || []).map(w => w.toLowerCase().trim()));
-    afterFeedback = afterFeedback.filter(w => !toRemove.has(w.word.toLowerCase().trim()));
-    if (feedback.add && feedback.add.length > 0) {
-      afterFeedback = mergeWords(afterFeedback, feedback.add);
-    }
-  } catch {
-    // Pass 2 failure is non-fatal
-  }
-
-  // Pass 3: Color detection approach
-  statusText.textContent = prefix ? `${prefix} - 第 3/3 轮补漏中...` : '第 3/3 轮：颜色检测补漏...';
-  detailText.textContent = `前两轮共找到 ${afterFeedback.length} 个词，正在补漏`;
-
-  let pass3Words = [];
-  try {
-    const content3 = await callAPI([{
-      role: 'user',
-      content: [...imageContentMid, { type: 'text', text: PROMPT3 }]
-    }], 0.4);
-    const parsed3 = parseWordsJSON(content3);
-    pass3Words = parsed3.words || [];
-  } catch {
-    // Pass 3 failure is non-fatal
-  }
-
-  return mergeWords(afterFeedback, pass3Words);
+  detailText.textContent = `正文区 ${topWords.length} 个 + 选项区 ${botWords.length} 个`;
+  return mergeWords(topWords, botWords);
 }
 
 // ===== Submit =====
