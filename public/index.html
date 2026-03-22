@@ -655,9 +655,11 @@ const PROMPT1 = `看这张英语试卷照片。有些英文单词被荧光笔涂
 
 请找出所有被荧光笔标记的单词。从试卷顶部开始，一行一行往下仔细看，列出每一个被彩色荧光笔标记覆盖的英文单词。被标记的单词可能有15-30个，请不要遗漏。
 
-请同时列出单个单词和短语（如 look forward to、take part in 等）。如果荧光笔标记覆盖了连续的多个词，请作为一个短语整体列出。
+重要：如果相邻的2-4个单词被荧光笔连续标记覆盖，必须将它们作为一个短语整体列出，不要拆成单独的词。
+常见短语示例：A couple of、In an instant、drew near、look forward to、give up、refer to、as for、all the way、step aside、bend down、stand up、go away。
+正文段落和选项区域中的短语都要识别。
 
-为每个单词或短语提供：音标（IPA）、词性（n./v./adj./adv./phr.等）、中文释义（最常用的1-2个含义）。
+为每个单词或短语提供：音标（IPA）、词性（单词用n./v./adj./adv.等，短语用phr.）、中文释义（最常用的1-2个含义）。
 
 输出纯JSON格式，不要其他文字：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}
@@ -672,9 +674,9 @@ const PROMPT2 = `仔细看这张英语试卷照片。找出所有被粉红色或
 3. 题目选项中被荧光笔标记的单词
 4. 所有有彩色覆盖层的单词，包括颜色较淡的
 
-请同时列出单个单词和短语。如果荧光笔标记覆盖了连续的多个词，请作为一个短语整体列出。
+重要：如果相邻的2-4个单词被荧光笔连续覆盖，必须作为一个短语整体列出（如 A couple of、In an instant、drew near、gave up、as for 等），不要拆成单独的词。正文和选项中的短语都要识别。
 
-每个单词或短语给出音标（IPA）、词性（含 phr. 表示短语）和中文释义。
+每个单词或短语给出音标（IPA）、词性（单词用n./v./adj./adv.等，短语用phr.）和中文释义。
 
 纯JSON输出：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
