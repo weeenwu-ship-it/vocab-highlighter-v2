@@ -1,31 +1,49 @@
-export async function onRequestPost(context) {
-  const BAIDU_API_KEY = context.env.BAIDU_API_KEY;
-  if (!BAIDU_API_KEY) {
-    return new Response(JSON.stringify({ error: 'API key not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+// Provider routing: Baidu (ernie) vs DashScope (qwen)
+const PROVIDERS = {
+  baidu: {
+    url: 'https://qianfan.baidubce.com/v2/chat/completions',
+    keyEnv: 'BAIDU_API_KEY',
+    defaultModel: 'ernie-4.5-turbo-vl',
+  },
+  dashscope: {
+    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+    keyEnv: 'DASHSCOPE_API_KEY',
+    defaultModel: 'qwen-vl-max',
+  },
+};
 
+function getProvider(model) {
+  if (model && model.startsWith('qwen')) return 'dashscope';
+  return 'baidu';
+}
+
+export async function onRequestPost(context) {
   try {
     const body = await context.request.json();
+    const providerName = getProvider(body.model);
+    const provider = PROVIDERS[providerName];
 
-    const response = await fetch(
-      'https://qianfan.baidubce.com/v2/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${BAIDU_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: body.model || 'ernie-4.5-turbo-vl',
-          messages: body.messages,
-          max_tokens: body.max_tokens || 3000,
-          temperature: body.temperature ?? 0.3,
-        }),
-      }
-    );
+    const apiKey = context.env[provider.keyEnv];
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: `${provider.keyEnv} not configured` }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const response = await fetch(provider.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: body.model || provider.defaultModel,
+        messages: body.messages,
+        max_tokens: body.max_tokens || 3000,
+        temperature: body.temperature ?? 0.3,
+      }),
+    });
 
     if (!response.ok) {
       const err = await response.text();
