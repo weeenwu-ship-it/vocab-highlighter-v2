@@ -633,6 +633,25 @@ function parseWordsJSON(content) {
   throw new Error('识别结果解析失败，请重试');
 }
 
+function parseFeedbackJSON(content) {
+  // Try direct parse
+  try { const r = JSON.parse(content); if (r.add) return r; } catch {}
+
+  // Try extracting from markdown code block
+  const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlock) {
+    try { const r = JSON.parse(codeBlock[1].trim()); if (r.add) return r; } catch {}
+  }
+
+  // Try extracting the {"add": [...], "remove": [...]} structure
+  const jsonMatch = content.match(/\{\s*"add"\s*:\s*\[[\s\S]*?\]\s*,\s*"remove"\s*:\s*\[[\s\S]*?\]\s*\}/);
+  if (jsonMatch) {
+    try { return JSON.parse(jsonMatch[0]); } catch {}
+  }
+
+  return { add: [], remove: [] };
+}
+
 function mergeWords(pass1, pass2) {
   const seen = new Set();
   const merged = [];
@@ -671,24 +690,42 @@ const PROMPT1 = `看这张英语试卷照片。有些英文单词被荧光笔涂
 
 如果没有找到任何标记的单词：{"words": []}`;
 
-const PROMPT2 = `仔细复查这张英语试卷照片，找出所有被荧光笔标记的英文单词。请特别注意不要遗漏。
+// Pass 2 template: feedback-based review using Pass 1 results
+function buildPrompt2(pass1Words) {
+  const wordList = pass1Words.map(w => w.word).join(', ');
+  return `我刚才扫描了这张英语试卷中被荧光笔标记的单词，找到了以下 ${pass1Words.length} 个：
+${wordList}
 
-复查重点：
-1. 文章正文——逐行重新扫描，特别注意颜色较淡或标记较小的词，不要漏掉正文中的任何标记
-2. 选项区域——A/B/C/D每个选项都平等检查，不论是否为正确答案
-3. 相邻被标记词如构成固定短语可整体列出，否则分别列出
+请你重新仔细看这张图片，对照我的结果进行查漏补缺：
 
-只看视觉标记，不做语义筛选。每个单词或短语给出音标（IPA）、词性和中文释义。纯JSON输出：
-{"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
+1. 检查我是否遗漏了被荧光笔标记的单词——特别注意：
+   - 正文中颜色较淡或较小的标记
+   - 选项区中被标记但我没列出的选项（A/B/C/D每个都要看）
+   - 行首、行尾容易被忽略的标记
 
-const PROMPT3 = `再看一遍这张英语试卷照片。找出所有被荧光笔（彩色覆盖层）标记的英文单词，尽可能多地找出来。
+2. 检查我是否有误判——把没有荧光笔标记的单词错误地列入了
 
-这次重点关注容易遗漏的区域：
-- 正文中颜色较淡的标记、行首行尾的标记、跨行的短语
-- 选项区中非正确答案选项上的荧光笔标记（A/B/C/D都要看）
+请输出你发现的所有遗漏词（新增的），以及误判的词（需要删除的）。
 
-只看视觉标记，不做语义判断。相邻标记词如构成固定短语可整体列出。
-每个词给出音标（IPA）、词性和中文释义。纯JSON输出：
+纯JSON输出：
+{"add": [{"word": "xxx", "phonetic": "/xxx/", "pos": "n.", "meaning": "xxx"}], "remove": ["误判的词"]}
+
+如果没有需要修改的：{"add": [], "remove": []}`;
+}
+
+const PROMPT3 = `请仔细观察这张英语试卷照片中的颜色。
+
+试卷上有些文字被荧光笔覆盖了——这些文字上面有一层半透明的彩色（粉红色、黄色、绿色、蓝色等），和普通的黑色印刷文字明显不同。
+
+请你逐行检查整个试卷（包括正文和下方的选项区），找出所有被彩色覆盖的英文单词。
+
+注意区分：
+- 有荧光笔标记的文字：文字上方有一层彩色覆盖，颜色和周围的黑字不同
+- 没有标记的文字：纯黑色印刷，没有彩色覆盖
+
+只列出你确定有彩色覆盖的单词。每个单词给出音标（IPA）、词性和中文释义。
+
+纯JSON输出：
 {"words": [{"word": "example", "phonetic": "/ɪɡˈzæmpl/", "pos": "n.", "meaning": "例子"}]}`;
 
 // ===== Process single image (three-pass) =====
@@ -717,27 +754,30 @@ async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) 
   const parsed1 = parseWordsJSON(content1);
   const pass1Words = parsed1.words || [];
 
-  // Pass 2
-  statusText.textContent = prefix ? `${prefix} - 第 2/3 轮复查中...` : '第 2/3 轮：复查中...';
-  detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在交叉复查`;
+  // Pass 2: Feedback-based review
+  statusText.textContent = prefix ? `${prefix} - 第 2/3 轮查漏补缺...` : '第 2/3 轮：查漏补缺...';
+  detailText.textContent = `第一轮找到 ${pass1Words.length} 个词，正在对照复查`;
 
-  let pass2Words = [];
+  let afterFeedback = [...pass1Words];
   try {
+    const prompt2 = buildPrompt2(pass1Words);
     const content2 = await callAPI([{
       role: 'user',
-      content: [...imageContentSmall, { type: 'text', text: PROMPT2 }]
+      content: [...imageContentSmall, { type: 'text', text: prompt2 }]
     }]);
-    const parsed2 = parseWordsJSON(content2);
-    pass2Words = parsed2.words || [];
+    const feedback = parseFeedbackJSON(content2);
+    const toRemove = new Set((feedback.remove || []).map(w => w.toLowerCase().trim()));
+    afterFeedback = afterFeedback.filter(w => !toRemove.has(w.word.toLowerCase().trim()));
+    if (feedback.add && feedback.add.length > 0) {
+      afterFeedback = mergeWords(afterFeedback, feedback.add);
+    }
   } catch {
     // Pass 2 failure is non-fatal
   }
 
-  const merged12 = mergeWords(pass1Words, pass2Words);
-
-  // Pass 3
-  statusText.textContent = prefix ? `${prefix} - 第 3/3 轮补漏中...` : '第 3/3 轮：补漏扫描...';
-  detailText.textContent = `前两轮共找到 ${merged12.length} 个词，正在补漏`;
+  // Pass 3: Color detection approach
+  statusText.textContent = prefix ? `${prefix} - 第 3/3 轮补漏中...` : '第 3/3 轮：颜色检测补漏...';
+  detailText.textContent = `前两轮共找到 ${afterFeedback.length} 个词，正在补漏`;
 
   let pass3Words = [];
   try {
@@ -751,7 +791,7 @@ async function processOneImage(file, imgIdx, totalImgs, statusText, detailText) 
     // Pass 3 failure is non-fatal
   }
 
-  return mergeWords(merged12, pass3Words);
+  return mergeWords(afterFeedback, pass3Words);
 }
 
 // ===== Submit =====
