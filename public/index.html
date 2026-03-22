@@ -448,7 +448,7 @@ footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
 <script>
 // ===== Configuration =====
 const API_URL = '/api/recognize';
-const MODEL = 'glm-4v-plus';  // 备选: 'ernie-4.5-turbo-vl' / 'qwen-vl-max'
+const MODEL = 'ernie-4.5-turbo-vl';  // 备选: 'glm-4v-plus' / 'qwen-vl-max'
 
 // ===== State =====
 let selectedFiles = [];
@@ -584,7 +584,7 @@ async function callAPI(messages, temp = 0.3) {
     body: JSON.stringify({
       model: MODEL,
       messages,
-      max_tokens: 3000,
+      max_tokens: MODEL.startsWith('glm') ? 2048 : 3000,
       temperature: temp,
     }),
   });
