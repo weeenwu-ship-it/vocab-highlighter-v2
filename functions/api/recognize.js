@@ -1,4 +1,4 @@
-// Provider routing: Baidu (ernie) vs DashScope (qwen)
+// Provider routing: Baidu (ernie) / DashScope (qwen) / Zhipu (glm)
 const PROVIDERS = {
   baidu: {
     url: 'https://qianfan.baidubce.com/v2/chat/completions',
@@ -10,10 +10,16 @@ const PROVIDERS = {
     keyEnv: 'DASHSCOPE_API_KEY',
     defaultModel: 'qwen-vl-max',
   },
+  zhipu: {
+    url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    keyEnv: 'ZHIPU_API_KEY',
+    defaultModel: 'glm-4v-plus',
+  },
 };
 
 function getProvider(model) {
   if (model && model.startsWith('qwen')) return 'dashscope';
+  if (model && model.startsWith('glm')) return 'zhipu';
   return 'baidu';
 }
 
